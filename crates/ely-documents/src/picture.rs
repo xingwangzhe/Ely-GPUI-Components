@@ -27,6 +27,16 @@ pub struct HeldPicture {
 }
 
 impl HeldPicture {
+    /// The encoded picture's format.
+    pub fn format(&self) -> ImageFormat {
+        self.format
+    }
+
+    /// The encoded bytes already held by the owner.
+    pub fn bytes(&self) -> &Arc<[u8]> {
+        &self.bytes
+    }
+
     /// A picture of `format` from `bytes`, hashed.
     pub fn new(format: ImageFormat, bytes: impl Into<Arc<[u8]>>) -> Self {
         let bytes = bytes.into();

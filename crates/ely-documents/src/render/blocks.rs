@@ -1,6 +1,6 @@
 use gpui::{
-    AnyElement, App, FontWeight, IntoElement, MouseButton, ParentElement, Role, Styled, StyledText,
-    div, prelude::*, svg,
+    AnyElement, App, FontWeight, IntoElement, MouseButton, ParentElement, Role, Styled, div,
+    prelude::*, svg,
 };
 
 use super::{Draw, LINE, point::point_lines};
@@ -68,6 +68,7 @@ impl Draw<'_> {
                         .child(bullet)
                         .into_any_element(),
                 };
+                let marker = self.select_region(marker, cx);
                 div()
                     .flex()
                     .gap_2()
@@ -124,7 +125,7 @@ impl Draw<'_> {
                     .font_weight(FontWeight::MEDIUM)
                     .text_color(tone)
                     .child(Icon::new(icon).size(IconSize::Sm).color(tone))
-                    .child(kind.title()),
+                    .child(self.select_code(kind.title(), Vec::new(), cx)),
             )
             .child(
                 div()
@@ -149,7 +150,7 @@ impl Draw<'_> {
                 let entry = div()
                     .id(self.key("toc"))
                     .debug_selector(move || format!("markdown-toc-{ix}"))
-                    .child(heading.title.clone());
+                    .child(self.select_code(&heading.title, Vec::new(), cx));
                 let entry = match heading.depth - top.expect("a heading is listed") {
                     0 => entry,
                     1 => entry.pl_4(),
@@ -190,7 +191,7 @@ impl Draw<'_> {
     /// Front matter as written, inside its box.
     pub(super) fn front_matter(&self, text: &str, from: usize, cx: &App) -> AnyElement {
         let theme = cx.theme();
-        let drawn = StyledText::new(text.to_string());
+        let drawn = self.select_code(text, Vec::new(), cx);
         let layout = drawn.layout().clone();
         let block = div()
             .p_3()

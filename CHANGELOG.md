@@ -4,6 +4,8 @@ What changes for an app built on Ely, newest first. An entry names the crates it
 
 ## Unreleased
 
+- `ely-documents`: `MarkdownRenderer::selection` shares a read-only text selection across rendered blocks, with copy and select-all scoped to its focus; formulas, diagrams and picture descriptions select as whole blocks. It cannot be combined with custom `code` elements. With selection enabled, `on_context` reports body, link and picture presses without fetching addresses. `HeldPicture::format` and `bytes` let owners copy or save already loaded pictures.
+
 - `ely-core`: Shell code colors a `#` right after the `)` that closes `$(`, `$((`, `<(` or `>(` as part of the word, as Bash reads it; only a bare subshell's `)` ends a word before a comment. A `case` pattern's `)` inside `$(` no longer counts as the `)` that closes it.
 - `ely-core`: a menu's icon buttons carry no selected state, so Windows offers their Invoke pattern to a screen reader; in a `SearchableMenu`, the arrows lend the panel focus so a reader hears the marked row or button, and typing or Backspace gives the filter focus back.
 - `ely-core`: adds the Korean `ko-KR` locale and Korean component messages. The gallery's i18n page holds one catalog per listed locale, Spanish and Korean too; its table is sized to `LOCALES`, so a new locale without one does not build.

@@ -67,7 +67,7 @@ pub use pages::{PageCover, PageIcon};
 pub use picture::{HeldPicture, Pictures};
 pub use print::{Margins, Paper, PrintPreview, PrintSettings, sheet};
 pub use reading::{Footnote, Glossary, ReadingProgress, TooltipTerm, ZenMode};
-pub use render::MarkdownRenderer;
+pub use render::{MarkdownContext, MarkdownRenderer, MarkdownSelection};
 pub use rich::RichTextEditor;
 pub use templates::{Template, TemplatePicker};
 pub use thumbs::PageThumbnailList;
@@ -80,6 +80,7 @@ pub use viewer::{DocPage, DocumentViewer, PageHit, PageNote};
 
 /// Binds the documents keys. `init` calls it.
 pub fn bind_keys(cx: &mut App) {
+    render::bind_selection_keys(cx);
     rich::bind_keys(cx);
     document::bind_keys(cx);
 }
