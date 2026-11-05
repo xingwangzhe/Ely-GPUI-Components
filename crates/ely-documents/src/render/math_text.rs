@@ -3,12 +3,12 @@
 use std::{cell::RefCell, ops::Range, rc::Rc, sync::Arc};
 
 use gpui::{
-    AnyElement, App, Bounds, Corners, Element, ElementId, GlobalElementId, HighlightStyle,
+    AnyElement, App, Bounds, Corners, Element, ElementId, Entity, GlobalElementId, HighlightStyle,
     InspectorElementId, IntoElement, LayoutId, Pixels, Point, RenderImage, SharedString, Size,
     TextLayout, TextStyleRefinement, Window, point,
 };
 
-use super::{OnLink, drawn_text};
+use super::{MarkdownSelection, OnLink, drawn_text};
 use crate::{
     theme::ActiveTheme,
     {
@@ -41,6 +41,7 @@ pub(super) struct MathText {
     pictures: Vec<(Arc<RenderImage>, Size<Pixels>, Range<usize>)>,
     /// One glue character's width.
     glue: Pixels,
+    selection: Option<(Entity<MarkdownSelection>, usize)>,
 }
 
 impl MathText {
@@ -71,8 +72,18 @@ impl MathText {
             text: None,
             pictures: Vec::new(),
             glue: Pixels::ZERO,
+            selection: None,
         };
         (text, at)
+    }
+
+    pub(super) fn selection(
+        mut self,
+        selection: Option<Entity<MarkdownSelection>>,
+        piece: usize,
+    ) -> Self {
+        self.selection = selection.map(|selection| (selection, piece));
+        self
     }
 }
 
@@ -207,9 +218,19 @@ impl Element for MathText {
             color: Some(cx.theme().colors.danger),
             ..HighlightStyle::default()
         };
-        let said = (errors.iter())
+        let mut said: super::Over = (errors.iter())
             .map(|ix| (swaps[*ix].1.clone(), danger))
             .collect();
+        if let Some((selection, piece)) = &self.selection {
+            said.extend(selection.read(cx).highlight(*piece, cx).into_iter().map(
+                |(range, style)| {
+                    (
+                        forward(&swaps, range.start)..forward(&swaps, range.end),
+                        style,
+                    )
+                },
+            ));
+        }
         let (mut text, layout) = drawn_text(
             &inline,
             (&hidden, said),
@@ -227,6 +248,14 @@ impl Element for MathText {
             ..TextStyleRefinement::default()
         });
         let id = window.with_text_style(taller, |window| text.request_layout(window, cx));
+        if let Some((selection, piece)) = &self.selection {
+            let mapping = swaps.clone();
+            selection.read(cx).mapped_layout(
+                *piece,
+                layout.clone(),
+                Some(Rc::new(move |at| back(&mapping, at))),
+            );
+        }
         self.pictures = (pictures.into_iter().zip(hidden))
             .map(|((image, size, _), drawn)| (image, size, drawn))
             .collect();

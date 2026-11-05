@@ -21,6 +21,7 @@ impl core::clone::Clone for ely_documents::Inline
 impl core::clone::Clone for ely_documents::InlineFormat
 impl core::clone::Clone for ely_documents::Margins
 impl core::clone::Clone for ely_documents::MarkdownBlock
+impl core::clone::Clone for ely_documents::MarkdownContext
 impl core::clone::Clone for ely_documents::MarkdownMode
 impl core::clone::Clone for ely_documents::MathError
 impl core::clone::Clone for ely_documents::Media
@@ -170,6 +171,7 @@ impl core::fmt::Debug for ely_documents::Inline
 impl core::fmt::Debug for ely_documents::InlineFormat
 impl core::fmt::Debug for ely_documents::Margins
 impl core::fmt::Debug for ely_documents::MarkdownBlock
+impl core::fmt::Debug for ely_documents::MarkdownContext
 impl core::fmt::Debug for ely_documents::MarkdownMode
 impl core::fmt::Debug for ely_documents::MathError
 impl core::fmt::Debug for ely_documents::Media
@@ -290,6 +292,7 @@ impl ely_documents::LinkEditor
 impl ely_documents::MarkdownDocument
 impl ely_documents::MarkdownEditor
 impl ely_documents::MarkdownRenderer
+impl ely_documents::MarkdownSelection
 impl ely_documents::Media
 impl ely_documents::PageCover
 impl ely_documents::PageHistoryDiff
@@ -370,6 +373,7 @@ impl gpui::element::RenderOnce for ely_documents::VersionHistory
 impl gpui::element::RenderOnce for ely_documents::WordCount
 impl gpui::element::RenderOnce for ely_documents::ZenMode
 impl gpui::window::Focusable for ely_documents::MarkdownDocument
+impl gpui::window::Focusable for ely_documents::MarkdownSelection
 impl<'a> ely_documents::MarkdownReader<'a>
 pub const ely_documents::LARGEST_READ: usize
 pub ely_documents::AlertKind::Caution
@@ -529,6 +533,9 @@ pub ely_documents::MarkdownBlock::Table::aligns: alloc::vec::Vec<ely_documents::
 pub ely_documents::MarkdownBlock::Table::head: alloc::vec::Vec<alloc::vec::Vec<ely_documents::MarkdownBlock>>
 pub ely_documents::MarkdownBlock::Table::rows: alloc::vec::Vec<alloc::vec::Vec<alloc::vec::Vec<ely_documents::MarkdownBlock>>>
 pub ely_documents::MarkdownBlock::Toc(alloc::vec::Vec<ely_documents::DocumentHeading>)
+pub ely_documents::MarkdownContext::image: core::option::Option<alloc::string::String>
+pub ely_documents::MarkdownContext::link: core::option::Option<alloc::string::String>
+pub ely_documents::MarkdownContext::position: gpui::geometry::Point<gpui::geometry::Pixels>
 pub ely_documents::MarkdownMode::Preview
 pub ely_documents::MarkdownMode::Source
 pub ely_documents::MarkdownMode::Split
@@ -826,9 +833,11 @@ pub fn ely_documents::Glossary::into_any_element(self) -> gpui::element::AnyElem
 pub fn ely_documents::Glossary::into_element(self) -> Self::Element
 pub fn ely_documents::Glossary::new(impl core::iter::traits::collect::IntoIterator<Item = (impl core::convert::Into<gpui_shared_string::SharedString>, impl core::convert::Into<gpui_shared_string::SharedString>)>) -> Self
 pub fn ely_documents::Glossary::render(self, &mut gpui::window::Window, &mut gpui::app::App) -> impl gpui::element::IntoElement
+pub fn ely_documents::HeldPicture::bytes(&self) -> &alloc::rcs::arc::Arc<[u8]>
 pub fn ely_documents::HeldPicture::clone(&self) -> Self
 pub fn ely_documents::HeldPicture::eq(&self, &Self) -> bool
 pub fn ely_documents::HeldPicture::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub fn ely_documents::HeldPicture::format(&self) -> gpui::platform::ImageFormat
 pub fn ely_documents::HeldPicture::hash<H: core::hash::Hasher>(&self, &mut H)
 pub fn ely_documents::HeldPicture::new(gpui::platform::ImageFormat, impl core::convert::Into<alloc::rcs::arc::Arc<[u8]>>) -> Self
 pub fn ely_documents::Inline::clone(&self) -> Self
@@ -855,6 +864,8 @@ pub fn ely_documents::Margins::fmt(&self, &mut core::fmt::Formatter<'_>) -> core
 pub fn ely_documents::MarkdownBlock::clone(&self) -> Self
 pub fn ely_documents::MarkdownBlock::eq(&self, &Self) -> bool
 pub fn ely_documents::MarkdownBlock::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub fn ely_documents::MarkdownContext::clone(&self) -> Self
+pub fn ely_documents::MarkdownContext::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 pub fn ely_documents::MarkdownDocument::block(&mut self, ely_documents::BlockCommand, &mut gpui::app::context::Context<'_, Self>) -> core::result::Result<(), ely_documents::EditRefusal>
 pub fn ely_documents::MarkdownDocument::caret(&self, &gpui::app::App) -> (usize, usize)
 pub fn ely_documents::MarkdownDocument::delete_image(&mut self, usize, &mut gpui::app::context::Context<'_, Self>) -> core::result::Result<(), ely_documents::EditRefusal>
@@ -904,11 +915,18 @@ pub fn ely_documents::MarkdownRenderer::code(self, impl core::ops::function::Fn(
 pub fn ely_documents::MarkdownRenderer::into_any_element(self) -> gpui::element::AnyElement
 pub fn ely_documents::MarkdownRenderer::into_element(self) -> Self::Element
 pub fn ely_documents::MarkdownRenderer::new(impl core::convert::Into<gpui::window::ElementId>, impl core::convert::Into<gpui_shared_string::SharedString>) -> Self
+pub fn ely_documents::MarkdownRenderer::on_context(self, impl core::ops::function::Fn(ely_documents::MarkdownContext, &mut gpui::window::Window, &mut gpui::app::App) + 'static) -> Self
 pub fn ely_documents::MarkdownRenderer::on_link(self, impl core::ops::function::Fn(&str, &mut gpui::window::Window, &mut gpui::app::App) + 'static) -> Self
 pub fn ely_documents::MarkdownRenderer::pictures(self, alloc::rcs::rc::Rc<ely_documents::Pictures>) -> Self
 pub fn ely_documents::MarkdownRenderer::render(self, &mut gpui::window::Window, &mut gpui::app::App) -> impl gpui::element::IntoElement
 pub fn ely_documents::MarkdownRenderer::sections(self, &gpui::app::entity_map::Entity<ely_core::navigation::toc::Sections>) -> Self
+pub fn ely_documents::MarkdownRenderer::selection(self, &gpui::app::entity_map::Entity<ely_documents::MarkdownSelection>) -> Self
 pub fn ely_documents::MarkdownRenderer::text_size(self, ely_core::theme::tokens::TextSize) -> Self
+pub fn ely_documents::MarkdownSelection::copy(&self, &mut gpui::app::App)
+pub fn ely_documents::MarkdownSelection::focus_handle(&self, &gpui::app::App) -> gpui::window::FocusHandle
+pub fn ely_documents::MarkdownSelection::new(&mut gpui::app::context::Context<'_, Self>) -> Self
+pub fn ely_documents::MarkdownSelection::select_all(&mut self, &mut gpui::app::context::Context<'_, Self>)
+pub fn ely_documents::MarkdownSelection::selected_text(&self) -> gpui_shared_string::SharedString
 pub fn ely_documents::MathError::clone(&self) -> Self
 pub fn ely_documents::MathError::eq(&self, &Self) -> bool
 pub fn ely_documents::MathError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
@@ -1112,10 +1130,12 @@ pub struct ely_documents::HeldPicture
 pub struct ely_documents::Inline
 pub struct ely_documents::Latex
 pub struct ely_documents::LinkEditor
+pub struct ely_documents::MarkdownContext
 pub struct ely_documents::MarkdownDocument
 pub struct ely_documents::MarkdownEditor
 pub struct ely_documents::MarkdownReader<'a>
 pub struct ely_documents::MarkdownRenderer
+pub struct ely_documents::MarkdownSelection
 pub struct ely_documents::MathError
 pub struct ely_documents::Media
 pub struct ely_documents::PageCover
@@ -1220,11 +1240,13 @@ pub use ely_documents::Latex = ely_documents::math::Latex
 pub use ely_documents::LinkEditor = ely_documents::link::LinkEditor
 pub use ely_documents::Margins = ely_documents::print::Margins
 pub use ely_documents::MarkdownBlock = ely_documents::tree::Node
+pub use ely_documents::MarkdownContext = ely_documents::render::selection::MarkdownContext
 pub use ely_documents::MarkdownDocument = ely_documents::document::MarkdownDocument
 pub use ely_documents::MarkdownEditor = ely_documents::modes::MarkdownEditor
 pub use ely_documents::MarkdownMode = ely_documents::modes::MarkdownMode
 pub use ely_documents::MarkdownReader = ely_documents::tree::Reader
 pub use ely_documents::MarkdownRenderer = ely_documents::render::MarkdownRenderer
+pub use ely_documents::MarkdownSelection = ely_documents::render::selection::MarkdownSelection
 pub use ely_documents::MathError = ely_documents::math::MathError
 pub use ely_documents::Media = ely_documents::blocks::kind::Media
 pub use ely_documents::PageCover = ely_documents::pages::PageCover

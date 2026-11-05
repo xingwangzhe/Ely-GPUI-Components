@@ -24,10 +24,14 @@ use crate::{
 mod blocks;
 mod math_text;
 mod point;
+mod selection;
 mod style;
 mod table;
 
 pub(crate) use point::{OnPoint, Place, Pointed, point_lines};
+use selection::OnContext;
+pub(crate) use selection::bind_keys as bind_selection_keys;
+pub use selection::{MarkdownContext, MarkdownSelection};
 use style::highlight;
 pub(crate) use table::{CellAt, OpenCell};
 
@@ -58,6 +62,8 @@ pub struct MarkdownRenderer {
     /// Drawn instead of the source when given.
     blocks: Option<Rc<[Node]>>,
     pictures: Option<Rc<Pictures>>,
+    selection: Option<Entity<MarkdownSelection>>,
+    on_context: Option<OnContext>,
 }
 
 impl MarkdownRenderer {
@@ -73,6 +79,8 @@ impl MarkdownRenderer {
             base: None,
             blocks: None,
             pictures: None,
+            selection: None,
+            on_context: None,
         }
     }
 
@@ -86,6 +94,26 @@ impl MarkdownRenderer {
     /// Pictures the owner holds, by address; read first.
     pub fn pictures(mut self, pictures: Rc<Pictures>) -> Self {
         self.pictures = Some(pictures);
+        self
+    }
+
+    /// Shares a read-only selection across all rendered blocks.
+    ///
+    /// Cannot be combined with `code`; custom elements own their input.
+    /// Formulas, diagrams and picture descriptions select as whole blocks.
+    pub fn selection(mut self, selection: &Entity<MarkdownSelection>) -> Self {
+        self.selection = Some(selection.clone());
+        self
+    }
+
+    /// Reports context presses without loading picture addresses.
+    ///
+    /// Requires `selection` for body and link hit testing.
+    pub fn on_context(
+        mut self,
+        handler: impl Fn(MarkdownContext, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_context = Some(Rc::new(handler));
         self
     }
 
@@ -108,6 +136,8 @@ impl MarkdownRenderer {
     }
 
     /// Code blocks drawn by the owner: id, language, code.
+    ///
+    /// Cannot be combined with `selection`.
     pub fn code(
         mut self,
         draw: impl Fn(ElementId, Option<SharedString>, SharedString) -> AnyElement + 'static,
@@ -202,6 +232,9 @@ struct Draw<'a> {
     table: std::cell::Cell<bool>,
     /// Tables drawn so far.
     tables: std::cell::Cell<usize>,
+    selection: Option<Entity<MarkdownSelection>>,
+    piece: std::cell::Cell<usize>,
+    on_context: &'a Option<OnContext>,
 }
 
 impl Draw<'_> {
@@ -212,10 +245,17 @@ impl Draw<'_> {
     }
 
     fn inline(&self, inline: &Inline, cx: &App) -> AnyElement {
+        let piece = self.piece.get();
+        self.piece.set(piece + 1);
         let links = (!inline.links.is_empty()).then(|| self.key("links"));
         if !inline.styles.iter().any(|(_, style)| *style == Style::Math) {
-            let (drawn, layout) =
-                drawn_text(inline, (&[], Vec::new()), links, self.hooks.on_link, cx);
+            let over = self.selection.as_ref().map_or_else(Vec::new, |selection| {
+                selection.read(cx).highlight(piece, cx)
+            });
+            let (drawn, layout) = drawn_text(inline, (&[], over), links, self.hooks.on_link, cx);
+            if let Some(selection) = &self.selection {
+                selection.read(cx).layout(piece, layout.clone());
+            }
             let at = move |position| {
                 layout
                     .index_for_position(position)
@@ -226,6 +266,7 @@ impl Draw<'_> {
         let on_link = self.hooks.on_link.clone();
         let (drawn, at) =
             math_text::MathText::new(self.key("math"), inline.clone(), links, on_link);
+        let drawn = drawn.selection(self.selection.clone(), piece);
         self.point_text(drawn.into_any_element(), at, inline)
     }
 
@@ -290,9 +331,11 @@ impl Draw<'_> {
             } => {
                 if language.as_deref() == Some("mermaid") {
                     let diagram = Diagram::new(self.key("diagram"), text.clone());
-                    return self.point_code(diagram.into_any_element(), None, text, *from);
+                    let diagram = self.select_region(diagram.into_any_element(), cx);
+                    return self.point_code(diagram, None, text, *from);
                 }
                 if let Some(draw) = self.code {
+                    self.piece.set(self.piece.get() + 1);
                     return draw(
                         self.key("code"),
                         language.clone().map(Into::into),
@@ -305,7 +348,7 @@ impl Draw<'_> {
                         .map_or_else(Vec::new, |syntax| code_colors_with(text, syntax, cx)),
                     None => code_colors(text, cx),
                 };
-                let code = StyledText::new(text.clone()).with_highlights(styles);
+                let code = self.select_code(text, styles, cx);
                 let layout = code.layout().clone();
                 let block = div()
                     .flex()
@@ -335,15 +378,18 @@ impl Draw<'_> {
                 .border_t_2()
                 .border_color(colors.border_strong)
                 .into_any_element(),
-            Node::Math(tex) => div()
-                .flex()
-                .justify_center()
-                .py_2()
-                .child(match Latex::parse(self.key("math"), tex) {
-                    Ok(math) => math.display().into_any_element(),
-                    Err(error) => failed(&error, tex, cx),
-                })
-                .into_any_element(),
+            Node::Math(tex) => self.select_region(
+                div()
+                    .flex()
+                    .justify_center()
+                    .py_2()
+                    .child(match Latex::parse(self.key("math"), tex) {
+                        Ok(math) => math.display().into_any_element(),
+                        Err(error) => failed(&error, tex, cx),
+                    })
+                    .into_any_element(),
+                cx,
+            ),
             Node::Image { alt, url, link, at } => {
                 let picture = div().id(self.key("image")).child(Picture {
                     id: self.key("picture"),
@@ -356,6 +402,7 @@ impl Draw<'_> {
                         .as_ref()
                         .and_then(|held| held.get(url).cloned()),
                 });
+                let picture = self.context_image(picture, url, link, cx);
                 let drawn = match link.clone() {
                     None => picture.into_any_element(),
                     Some(address) => {
@@ -372,6 +419,7 @@ impl Draw<'_> {
                             .into_any_element()
                     }
                 };
+                let drawn = self.select_region(drawn, cx);
                 self.point_image(drawn, *at, url, link)
             }
             Node::Footnote { label, body } => div()
@@ -379,7 +427,11 @@ impl Draw<'_> {
                 .gap_2()
                 .text_size(theme.text_size(TextSize::Sm))
                 .text_color(colors.fg_muted)
-                .child(div().flex_none().child(format!("[{label}]")))
+                .child(div().flex_none().child(self.select_code(
+                    &format!("[{label}]"),
+                    Vec::new(),
+                    cx,
+                )))
                 .child(
                     div()
                         .flex_1()
@@ -425,13 +477,23 @@ pub(crate) fn draw_nodes(
         lists: std::cell::Cell::new(0),
         table: std::cell::Cell::new(false),
         tables: std::cell::Cell::new(0),
+        selection: None,
+        piece: std::cell::Cell::new(0),
+        on_context: &None,
     };
     draw.nodes(nodes, cx)
 }
 
 impl RenderOnce for MarkdownRenderer {
     fn render(self, _: &mut Window, cx: &mut App) -> impl IntoElement {
-        let theme = cx.theme();
+        assert!(
+            self.selection.is_none() || self.code.is_none(),
+            "selection cannot be combined with custom code elements"
+        );
+        assert!(
+            self.on_context.is_none() || self.selection.is_some(),
+            "context presses require a selection entity"
+        );
         let parsed;
         let nodes: &[Node] = match &self.blocks {
             Some(blocks) => blocks,
@@ -440,12 +502,29 @@ impl RenderOnce for MarkdownRenderer {
                 &parsed
             }
         };
+        if let Some(selection) = &self.selection {
+            let nodes = self.blocks.clone().unwrap_or_else(|| nodes.to_vec().into());
+            selection.update(cx, |selection, _| selection.prepare(nodes));
+        }
+        let on_link = self
+            .selection
+            .as_ref()
+            .map(|selection| {
+                let (selection, on_link) = (selection.clone(), self.on_link.clone());
+                Rc::new(move |url: &str, window: &mut Window, cx: &mut App| {
+                    if !selection.read(cx).dragged() {
+                        open_link(&on_link, url, window, cx);
+                    }
+                }) as OnLink
+            })
+            .or_else(|| self.on_link.clone());
+        let theme = cx.theme();
         let draw = Draw {
             id: &self.id,
             hooks: Hooks {
                 base: &self.base,
                 pictures: &self.pictures,
-                on_link: &self.on_link,
+                on_link: &on_link,
                 on_heading: &None,
                 on_point: &None,
                 cell: None,
@@ -459,14 +538,21 @@ impl RenderOnce for MarkdownRenderer {
             lists: std::cell::Cell::new(0),
             table: std::cell::Cell::new(false),
             tables: std::cell::Cell::new(0),
+            selection: self.selection.clone(),
+            piece: std::cell::Cell::new(0),
+            on_context: &self.on_context,
         };
         div()
+            .id(self.id.clone())
             .flex()
             .flex_col()
             .gap_3()
             .text_size(theme.text_size(self.size))
             .line_height(theme.text_size(self.size) * LINE)
             .children(draw.nodes(nodes, cx))
+            .when_some(self.selection, |root, selection| {
+                selection::listen(root, selection, self.on_context, cx)
+            })
     }
 }
 
